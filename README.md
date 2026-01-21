@@ -87,12 +87,12 @@ Run the analyzer on a **folder** containing C code.
 
 Example (FreeRTOS):
 ```
-python analyze_folder_callsites_v2.py C:\path\to\FreeRTOS\Source
+python analyze_folder_callsites.py C:\path\to\FreeRTOS\Source
 ```
 
 Example (Zephyr USB):
 ```
-python analyze_folder_callsites_v2.py C:\path\to\zephyr\subsys\usb
+python analyze_folder_callsites.py C:\path\to\zephyr\subsys\usb
 ```
 
 This generates:
@@ -111,7 +111,7 @@ You can launch CodeMap using either the JSON file **or the folder**.
 
 Recommended (folder‑based):
 ```
-python nav_console_v3.py C:\path\to\zephyr\subsys\usb
+python nav_console.py C:\path\to\zephyr\subsys\usb
 ```
 
 CodeMap will automatically pick the latest callgraph JSON in the folder.
