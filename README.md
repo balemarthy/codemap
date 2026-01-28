@@ -2,334 +2,223 @@
 
 **Map your code. Understand the system.**
 
-A **console‑first source mapping and navigation tool** inspired by Source Insight.
+CodeMap is a lightweight **Source Insight style** tool for exploring large C codebases (FreeRTOS, Zephyr, drivers, BLE, USB, Ethernet, RTOS kernels) by building a **static call graph with call sites**, then letting you browse it in:
 
-CodeMap helps you **understand large C codebases** (FreeRTOS, Zephyr, BLE, USB, Ethernet, RTOS kernels, drivers) by building a **call‑graph‑driven code map** and letting you navigate:
-- functions
-- call relationships
-- exact call sites
-- multiple implementations of the same symbol
+- **GUI** (PySide6) . constellation view (1-hop callers and callees), clickable navigation
+- **CLI** . console navigation with search, history, bookmarks, call-site jumps
 
-It is designed for **research, reading, and comprehension**, not for building or compiling code.
-
----
-
-## Why CodeMap exists
-
-Modern IDEs are excellent for editing and debugging, but they are **not optimized for subsystem research**.
-
-When you open an unfamiliar codebase, you usually want to answer questions like:
-- Where does execution start?
-- Which functions are central hubs?
-- Who calls this function?
-- Where exactly is this function invoked?
-- What are the alternative implementations of this API?
-
-IDEs answer these questions indirectly, file by file.
-
-**CodeMap answers them directly** by turning code into a **navigable map**, not just a collection of files.
+CodeMap is for **research and comprehension**, not for building or compiling code.
 
 ---
 
 ## What CodeMap does (and does not do)
 
-### CodeMap **does**:
-- Parse C source code statically (no build required)
+### CodeMap does
+- Parse C source statically (no build required)
 - Extract function definitions
-- Extract function call relationships
+- Extract call relationships
 - Record **exact call sites** (file + line + column)
-- Support **multiple definitions per function name**
-- Allow interactive navigation with history and bookmarks
+- Let you navigate callers and callees quickly
+- Support non-linear exploration via “go deep by clicking”
 
-### CodeMap **does not**:
+### CodeMap does not
 - Compile code
-- Resolve macros fully
-- Apply build configurations
+- Resolve build configs and macros fully
 - Guarantee runtime correctness
 
-Ambiguity is treated as a **feature**, not a bug.
+Ambiguity is treated as a feature.
 
 ---
 
-## High‑level architecture
+## Repository layout
 
 ```
-C source files
-   ↓
-Tree‑sitter C parser
-   ↓
-Static call graph + call sites
-   ↓
-JSON index (project snapshot)
-   ↓
-CodeMap Console Navigator (V3)
+codemap/
+├─ codemap-cli/        # console navigator
+├─ codemap-indexer/    # indexer that generates callgraph + callsites
+├─ codemap-gui/        # PySide6 GUI
+├─ docs/
+├─ requirements.txt
+├─ run_codemap.ps1
+└─ README.md
 ```
-
-The console navigator is intentionally **UI‑agnostic** so the same core can later power a PyQt / Qt GUI.
 
 ---
 
 ## Requirements
 
-- Python 3.9 or later
-- Windows / Linux / macOS
+- Python 3.9+ (Windows, Linux, macOS)
+- Dependencies:
+  - tree_sitter==0.20.4
+  - tree_sitter_languages==1.10.2
+  - PySide6 (GUI)
 
-Python dependencies:
+Install (recommended in a venv):
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\activate
+pip install -r requirements.txt
+pip install PySide6
 ```
-pip install tree_sitter==0.20.4 tree_sitter_languages==1.10.2
+
+If your `requirements.txt` already includes PySide6, the last line is not needed.
+
+---
+
+# Quick start. GUI (PySide6)
+
+The GUI is the best way to “see the system” fast.
+
+## Step 1. Run the GUI
+
+From repo root:
+
+```powershell
+python .\codemap-gui\app.py
+```
+
+Alternative (if you prefer running inside the folder):
+
+```powershell
+cd .\codemap-gui
+python .\app.py
+```
+
+## Step 2. Open a code folder
+
+In the GUI:
+
+1. Click **Open Folder**
+2. Select the root folder of the code you want to analyze  
+   Example: `FreeRTOS/Source` or `zephyr/subsys/usb`
+
+What happens next:
+
+- CodeMap creates a workspace folder inside your selected project:
+  ```
+  <your-folder>/.codemap/
+  ```
+- CodeMap runs the indexer automatically using that selected folder path
+- The generated index JSON is stored in:
+  ```
+  <your-folder>/.codemap/_callgraph_callsites.json
+  ```
+
+So you do not need to manually generate or browse for JSON files.
+
+## Step 3. Use the GUI effectively
+
+### Layout
+- **Left top**: Files
+- **Left bottom**: Outline (symbols in selected file)
+- **Center**: Constellation view (1-hop map)
+- **Right**: Tabs
+  - Callers
+  - Callees
+  - Call Sites
+
+### Constellation controls
+- **Click a node** to make it the new center (go deep step by step)
+- **Hover a node** to highlight it (and reduce visual noise)
+- **Mouse wheel** zoom
+- **Drag** to pan (hand drag)
+- **Fit** button to auto-fit to current graph
+- **Zoom slider** for controlled zoom
+
+### Navigation flow (recommended)
+1. Pick a file on the left
+2. Pick a function in Outline
+3. See callers and callees in the constellation
+4. Click a caller or callee node to go deeper
+5. Use Back / Forward to return and explore alternative paths
+
+---
+
+# Quick start. CLI (Console Navigator)
+
+The CLI remains available and unchanged. Use it when you want fast keyboard-driven navigation.
+
+## Step 1. Generate index (manual CLI way)
+
+Run the analyzer on a folder containing C code:
+
+```powershell
+python .\codemap-indexer\analyze_folder_callsites.py "C:\path\to\FreeRTOS\Source"
+```
+
+This creates a callgraph JSON (depending on version, names may differ), commonly:
+
+- `_callgraph_callsites.json`
+- or `_callgraph.json` (intermediate or alternate output)
+
+## Step 2. Start the console navigator
+
+Recommended folder-based mode:
+
+```powershell
+python .\codemap-cli\nav_console_v3.py "C:\path\to\zephyr\subsys\usb"
 ```
 
 ---
 
-## Step 1: Generate the code map (index)
+## Windows helper script (CLI convenience)
 
-Run the analyzer on a **folder** containing C code.
-
-Example (FreeRTOS):
-```
-python analyze_folder_callsites_v2.py C:\path\to\FreeRTOS\Source
-```
-
-Example (Zephyr USB):
-```
-python analyze_folder_callsites_v2.py C:\path\to\zephyr\subsys\usb
-```
-
-This generates:
-```
-_callgraph_callsites.json
-```
-inside the target folder.
-
-This JSON file is the **CodeMap project snapshot**.
-
----
-
-## Step 2: Start CodeMap (console)
-
-You can launch CodeMap using either the JSON file **or the folder**.
-
-Recommended (folder‑based):
-```
-python nav_console_v3.py C:\path\to\zephyr\subsys\usb
-```
-
-CodeMap will automatically pick the latest callgraph JSON in the folder.
-
----
-
-## Startup screen (what you should see)
-
-```
-===================================================
- CodeMap – Console Navigator (V3)
-===================================================
-Type 'help' or '?' at any time to see all commands.
-
-Quick start:
-  s   -> search & select function
-  o   -> open function definition
-  cs  -> jump to call site
-  cb  -> who calls this symbol
-  b/f -> back / forward
-  m   -> bookmark current view
-  q   -> quit
-```
-
----
-
-## Core navigation workflow
-
-### 1. Search for a function
-```
-cmd> s
-Search substring> xQueue
-```
-
-Select a function from the list.
-
----
-
-### 2. Open its definition
-```
-cmd> o
-```
-
-If multiple definitions exist, CodeMap lets you choose which implementation to view.
-
----
-
-### 3. Jump to call sites
-```
-cmd> cs
-```
-
-- Choose a callee
-- Choose an exact call site
-- CodeMap prints a **contextual code snippet with line highlighting**
-
----
-
-### 4. See who calls this symbol
-```
-cmd> cb
-```
-
-This shows all caller locations across the indexed folder.
-
----
-
-### 5. Navigate freely
-
-- `b` . go back
-- `f` . go forward
-
-This makes exploration safe and non‑linear, which is essential for research.
-
----
-
-### 6. Bookmark important locations
-```
-cmd> m
-```
-
-Bookmarks help you build a **reading and research plan** while exploring.
-
-List bookmarks:
-```
-cmd> marks
-```
-
----
-
-### 7. Save a research session
-```
-cmd> save
-```
-
-This writes `session.json` next to the index file.
-
-A session stores:
-- current location
-- navigation history
-- bookmarks
-
----
-
-## Full command reference
-
-Type at any time:
-```
-help
-```
-
-Commands:
-- `s` . search & select function
-- `o` . open function definition
-- `c` . list callees (unique)
-- `cs` . jump to call site
-- `cb` . who calls this symbol
-- `jd` . jump to definition of a symbol
-- `b` . back
-- `f` . forward
-- `m` . bookmark current view
-- `marks` . list bookmarks
-- `save` . save session
-- `q` . quit
-
----
-
-## Intended usage (important)
-
-CodeMap is built for:
-- subsystem research
-- onboarding to large embedded codebases
-- architectural understanding
-- academic or industrial exploration
-
-It is **not** a replacement for an IDE.
-
-Think of CodeMap as a **code map and navigation companion** that complements your editor.
-
----
-
-## Repository structure (recommended)
-
-```
-codemap/
-├─ codemap-core/   # indexing + navigation engine
-├─ codemap-cli/    # console navigator
-├─ codemap-gui/    # (future) PyQt / Qt GUI
-├─ docs/
-├─ README.md
-├─ requirements.txt
-└─ LICENSE
-```
-
-All components can live in a **single repository** initially and be split later if needed.
-
----
-## Windows helper (recommended)
-
-This repo includes a one-command runner for Windows.
-
-### Run
+This repo includes a one-command runner for Windows:
 
 ```powershell
 .\run_codemap.ps1 "C:\path\to\zephyr\subsys\usb"
-```   
-# Start navigator (folder-based)
-python .\codemap-cli\nav_console_v3.py "$Folder"
+```
 
-Run it
+If PowerShell blocks scripts, run once:
 
-From PowerShell:
-
-cd C:\codemap
-.\run_codemap.ps1 "C:\path\to\zephyr\subsys\usb"
-
-
-If PowerShell blocks scripts
-
-Run this once:
+```powershell
 Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+```
 
 ---
 
-## Open‑source roadmap
+## Generated files (important)
 
-### v0.1 (current)
-- Static indexer with call sites
-- Console navigation
-- History + bookmarks + sessions
+When you open a folder in the GUI, CodeMap creates:
 
-### v0.2
-- Larger context views (`open file`, adjustable context)
-- Noise filtering (macros, tracing calls)
-- Session load / resume
+```
+<your-project>/.codemap/
+```
 
-### v0.3
-- Stabilize core APIs
-- Clean separation: core vs CLI
+This folder is project-local and should NOT be committed.
 
-### v0.4
-- PyQt / Qt GUI using the same core
+Recommended `.gitignore` entries:
 
-Graph visualization comes **after** navigation is proven useful.
+```
+.venv/
+**/.codemap/
+**/_callgraph*.json
+```
+
+---
+
+## Roadmap
+
+### v0 (current)
+- Indexer produces call sites JSON
+- GUI constellation view (1-hop), clickable go-deep navigation
+- CLI navigator remains available
+
+### Next
+- Open definition and show code snippet in GUI
+- Click a callsite and jump to file + line
+- Filtering and decluttering (hide macros, test hooks, tracing noise)
+- Session save and restore in GUI
 
 ---
 
 ## Feedback requested
 
-If you are using CodeMap, please answer:
+If you use CodeMap, answer these:
 1. Where did you feel lost?
-2. Which command did you use the most?
-3. Did call‑site jumping help?
-4. What would save you time daily?
-
-Your feedback directly shapes the next iteration of CodeMap.
-
----
+2. What helped you understand faster. constellation, call sites, or file outline?
+3. What would you want as the next “killer feature”. open definition, jump to callsite, or filtering?
 
 Happy exploring.
 
